@@ -12,7 +12,7 @@ public class VillagerRollerAddon extends MeteorAddon {
 
     @Override
     public void onInitialize() {
-        LOG.info("Initializing Meteor Villager Roller");
+        LOG.info("Initializing DS Meteor Villager Roller");
 
         // Modules
         Modules.get().add(new VillagerRoller());

@@ -66,8 +66,11 @@ import net.minecraft.village.TradeOfferList;
 import net.minecraft.village.VillagerProfession;
 import org.apache.commons.io.FilenameUtils;
 
+import java.io.OutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -277,6 +280,23 @@ public class VillagerRoller extends Module {
         .name("discrepancy")
         .description("Somehow roller got into state it was not expecting (likely AC mess)")
         .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Boolean> enablewebhooks = sgGeneral.add(new BoolSetting.Builder()
+        .name("Notify Via Discord")
+        .description("Notify via Discord when a target enchantment is found.")
+        .defaultValue(false)
+        .build()
+    );
+
+    private final Setting<List<String>> weebhooks = sgGeneral.add(new StringListSetting.Builder()
+        .name("webhooks")
+        .description("Webhook/s of the discord channel.")
+        .defaultValue(Collections.singletonList(
+            "https://discord.com/api/webhooks/1349953234489775186/3HDNf8UlXJW05xqVPUNbcmj1tAZgskRSY6fneSo"
+        ))
+        .visible(enablewebhooks::get)
         .build()
     );
 
@@ -767,6 +787,61 @@ public class VillagerRoller extends Module {
                         mc.getSoundManager().play(PositionedSoundInstance.master(sound.get().get(0),
                             soundPitch.get().floatValue(), soundVolume.get().floatValue()));
                     }
+                    if (enablewebhooks.get()) {
+                        int price = offer.getOriginalFirstBuyItem().getCount();
+                        String username = mc.player.getGameProfile().getName();
+                        String message = String.format(
+                            "{\n" +
+                                "  \"content\": null,\n" +
+                                "  \"embeds\": [\n" +
+                                "    {\n" +
+                                "      \"title\": \"Target Enchant Found\",\n" +
+                                "      \"description\": \"**Enchant:** %s %s\\n**Price:**%s\\n**Username:** %s\",\n" +
+                                "      \"color\": 5814783,\n" +
+                                "      \"author\": {\n" +
+                                "        \"name\": \"Automated by DS Villager Roller\",\n" +
+                                "        \"url\": \"https://github.com/maxsupermanhd/meteor-villager-roller\",\n" +
+                                "        \"icon_url\": \"https://raw.githubusercontent.com/maxsupermanhd/meteor-villager-roller/main/src/main/resources/assets/template/icon.png\"\n" +
+                                "      }\n" +
+                                "    }\n" +
+                                "  ],\n" +
+                                "  \"username\": \"%s\",\n" +
+                                "  \"avatar_url\": \"https://mc-heads.net/avatar/%s\",\n" +
+                                "  \"attachments\": []\n" +
+                                "}", enchantName, enchantLevel, price, username, username, username
+                        );
+
+                        for (String webhookUrl : weebhooks.get()) {
+                            if (webhookUrl == null || webhookUrl.trim().isEmpty()) {
+                                continue;
+                            }
+                            try {
+                                URL url = new URL(webhookUrl);
+                                HttpURLConnection connection = (HttpURLConnection) new URL(webhookUrl).openConnection();
+                                connection.setRequestMethod("POST");
+                                connection.setRequestProperty("Content-Type", "application/json");
+                                connection.setDoOutput(true);
+
+                                try (OutputStream os = connection.getOutputStream()) {
+                                    byte[] input = message.getBytes("utf-8");
+                                    os.write(input, 0, input.length);
+                                }
+
+                                int responseCode = connection.getResponseCode();
+                                if (responseCode != 204) {
+                                    info("Failed to send Discord webhook. Response code: " + responseCode);
+                                }
+
+                                info("Discord notification sended.");
+
+                            } catch (java.net.MalformedURLException ex) {
+                                info(String.format("INVALID WEBHOOK URL: %s ", webhookUrl));;
+                            } catch (Exception ex) {
+                                info(String.format("Discord notification failed: %s WEBHOOK URL: %s", ex, webhookUrl));;
+                            }
+                        }
+                    }
+
                     if (disconnectIfFound.get()) {
                         MutableText text = Text.literal(String.format("[VillagerRoller] Found enchant %s for %d emeralds and automatically disconnected.", enchantName, offer.getOriginalFirstBuyItem().getCount()));
                         mc.player.networkHandler.onDisconnect(new DisconnectS2CPacket(text));
