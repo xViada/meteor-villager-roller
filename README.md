@@ -1,5 +1,5 @@
 
-# Meteor Villager Roller
+# Meteor Villager Roller with Discord Notifications
 
 ![checks](https://github.com/maxsupermanhd/meteor-villager-roller/actions/workflows/checks.yml/badge.svg)
 ![devbuild](https://github.com/maxsupermanhd/meteor-villager-roller/actions/workflows/devbuild.yml/badge.svg)
